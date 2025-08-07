@@ -327,9 +327,9 @@ class PIM:
         if layer.type == LayerType.X2G:
             return self._io_time_energy(layer)
 
-        elif layer.type == LayerType.MATMUL:
+        elif layer.type == LayerType.MATMUL or layer.type == LayerType.FC:
             ## operational granularity = the attention layer
-            if 'score' in layer.name:
+            if 'score' in layer.name or 'context' in layer.name:
                 m, n, k, numOp, dbyte = layer.get_infos()
                 time, traffic = self.ramulator.output(
                     self.pim_type, layer, self.power_constraint)

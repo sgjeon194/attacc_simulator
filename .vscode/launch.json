@@ -55,7 +55,7 @@
                 "--ngpu", "8", 
                 "--model", "GPT-175B",
                 "--lin", "2048", 
-                "--lout", "1",
+                "--lout", "2",
                 "--batch", "1",
                 "--pim", "bank",
                 "--powerlimit", "--ffopt", "--pipeopt"

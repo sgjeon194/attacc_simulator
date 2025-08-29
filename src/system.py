@@ -244,11 +244,13 @@ class System:
                     if layer.type in [
                             LayerType.MATMUL, LayerType.SOFTMAX, LayerType.X2G
                     ]:
-                        exec_time, energy = self.devices[
-                            'Acc'].get_time_and_energy(layer)
+                        print(f"{layer.name} Acc")
+                        exec_time, energy = self.devices['Acc'].get_time_and_energy(layer)
                     else:
-                        exec_time, energy = self.devices[
-                            'GPU'].get_time_and_energy(layer)
+                        print(f"{layer.name} GPU")
+                        exec_time, energy = self.devices['GPU'].get_time_and_energy(layer)
+                    print(f"    time : {exec_time}, energy : {energy}")
+                    
                     layer.exec_time = exec_time
                     layer.energy = energy
                     g_flops += layer.get_flops() * self.devices['GPU'].num_xpu
@@ -358,26 +360,32 @@ class System:
                     elif layer.type == LayerType.SOFTMAX:
                         g_perf['softmax'] += exec_time
 
-            g_perf = {k: v / (lout - 1) for k, v in g_perf.items()}
+            if lout > 1:
+                g_perf = {k: v / (lout - 1) for k, v in g_perf.items()}
 
             energies = [
-                unit_energy['g_all'], unit_energy['g_offmem'],
-                unit_energy['g_l2'], unit_energy['g_l1'], unit_energy['g_reg'],
-                unit_energy['g_alu'], gen_energies[LayerType.FC]['mem'],
-                gen_energies[LayerType.FC]['comp'],
-                gen_energies[LayerType.MATMUL]['mem'] +
-                gen_energies[LayerType.SOFTMAX]['mem'],
-                gen_energies[LayerType.MATMUL]['comp'] +
-                gen_energies[LayerType.SOFTMAX]['comp'],
-                gen_energies[LayerType.ACT]['mem'] +
-                gen_energies[LayerType.NORM]['mem'],
-                gen_energies[LayerType.ACT]['comp'] +
-                gen_energies[LayerType.NORM]['comp']
+                unit_energy.get('g_all', 0),
+                unit_energy.get('g_offmem', 0),
+                unit_energy.get('g_l2', 0),
+                unit_energy.get('g_l1', 0),
+                unit_energy.get('g_reg', 0),
+                unit_energy.get('g_alu', 0),
+                gen_energies.get(LayerType.FC, {}).get('mem', 0),
+                gen_energies.get(LayerType.FC, {}).get('comp', 0),
+                gen_energies.get(LayerType.MATMUL, {}).get('mem', 0) +
+                gen_energies.get(LayerType.SOFTMAX, {}).get('mem', 0),
+                gen_energies.get(LayerType.MATMUL, {}).get('comp', 0) +
+                gen_energies.get(LayerType.SOFTMAX, {}).get('comp', 0),
+                gen_energies.get(LayerType.ACT, {}).get('mem', 0) +
+                gen_energies.get(LayerType.NORM, {}).get('mem', 0),
+                gen_energies.get(LayerType.ACT, {}).get('comp', 0) +
+                gen_energies.get(LayerType.NORM, {}).get('comp', 0)
             ]
             comm_energy = sum([v['comm'] for k, v in gen_energies.items()])
             energies.append(comm_energy)
 
-            energies = [i / (lout - 1) for i in energies]
+            if lout > 1:
+                energies = [i / (lout - 1) for i in energies]
 
             perf = list(s_perf.values()) + list(g_perf.values())
 
@@ -405,8 +413,9 @@ class System:
                 perf_all = [v + perf[i] for i, v in enumerate(perf_all)]
                 energy_all = [v + energy[i] for i, v in enumerate(energy_all)]
 
-        s_flops = s_flops * self.model.ndec / (lout - 1)
-        g_flops = g_flops * self.model.ndec / (lout - 1)
+        if lout > 1:
+            s_flops = s_flops * self.model.ndec / (lout - 1)
+            g_flops = g_flops * self.model.ndec / (lout - 1)
 
         ## Concat tag
         cap = self.devices['GPU'].aggregate_memory_capacity
@@ -434,10 +443,13 @@ class System:
             config[0] = self.devices['Acc'].pim_type.name
 
         output = [tag, config, perf_all, energy_all]
-        print(
-            "    Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
-            .format(batch_size, batch_size / ((perf_all[len(s_perf)]) / 1000),
-                    perf_all[len(s_perf)], pipe, parallel_ff, power_constraint))
+        if lout > 1:
+            print(
+                "    Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
+                .format(batch_size, batch_size / ((perf_all[len(s_perf)]) / 1000),
+                        perf_all[len(s_perf)], pipe, parallel_ff, power_constraint))
+        else:
+            print("No generation")
 
         if perfs is not None:
             perfs.append(output)

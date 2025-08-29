@@ -1,0 +1,5 @@
+{
+    "git.autoRepositoryDetection": true,
+    "git.repositoryScanMaxDepth": 5,
+    "cmake.ignoreCMakeListsMissing": true
+}

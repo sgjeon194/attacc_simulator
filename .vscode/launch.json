@@ -1,0 +1,66 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug atten trace gen batch size 1",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_attacc_bank.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dhead", "128", 
+                "--nhead", "3", 
+                "--seqlen", "2048",
+                "--dbyte", "2", 
+                "--output", "gen_trace_output_attacc_l2048_nattn3_dhead128_dbyte2_pc1.trace"
+            ]
+        },
+        {
+            "name": "Python: Debug atten trace gen batch size 256",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_attacc_bank.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dhead", "128", 
+                "--nhead", "615", 
+                "--seqlen", "2048",
+                "--dbyte", "2", 
+                "--output", "gen_trace_output_attacc_l2048_nattn615_dhead128_dbyte2_pc1.trace"
+            ]
+        },
+        {
+            "name": "Python: Debug lora trace gen",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_attacc_bank.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dhead", "128",
+                "--nhead", "52", 
+                "--seqlen", "32",
+                "--dbyte", "2", 
+                "--output", "gen_trace_output_attacc_l32_nattn52_dhead128_dbyte2_pc1.trace"
+            ]
+        },
+        {
+            "name": "Python: Debug attacc",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--system", "dgx-attacc", 
+                "--gpu", "A100a", 
+                "--ngpu", "8", 
+                "--model", "GPT-175B",
+                "--lin", "2048", 
+                "--lout", "1",
+                "--batch", "1",
+                "--pim", "bank",
+                "--powerlimit", "--ffopt", "--pipeopt"
+            ]
+        }
+    ]
+  }
+  

@@ -236,34 +236,34 @@ class Ramulator:
                       (self.df['dbyte'] == dbyte) & (self.df['dhead'] == dhead) & \
                       (self.df['power_constraint'] == power_constraint) &  \
                       (self.df['pim_type'] == pim_type.name)]
-        if row.empty:
-            return self.run(pim_type, layer, power_constraint)
+        # if row.empty:
+        return self.run(pim_type, layer, power_constraint)
 
-        else:
-            cycle = int(row.iloc[0]['cycle'])
-            mac = int(row.iloc[0]['mac'])
-            softmax = int(row.iloc[0]['softmax'])
-            mvgb = int(row.iloc[0]['mvgb'])
-            mvsb = int(row.iloc[0]['mvsb'])
-            wrgb = int(row.iloc[0]['wrgb'])
-            si_io = wrgb * 32  # 256 bit
-            tsv_io = (wrgb + mvsb + mvgb) * 32
-            giomux_io = (wrgb + mvsb + mvgb) * 32
-            bgmux_io = (wrgb + mvsb + mvgb) * 32
-            mem_acc = mac * 32
-            if pim_type == PIMType.BA:
-                # pCH * Rank * bank group * bank
-                mem_acc *= 2 * 2 * 4 * 4
-            elif pim_type == PIMType.BG:
-                # pCH * Rank * bank group
-                mem_acc *= 2 * 2 * 4
-            else:
-                mem_acc *= 2
+        # else:
+        #     cycle = int(row.iloc[0]['cycle'])
+        #     mac = int(row.iloc[0]['mac'])
+        #     softmax = int(row.iloc[0]['softmax'])
+        #     mvgb = int(row.iloc[0]['mvgb'])
+        #     mvsb = int(row.iloc[0]['mvsb'])
+        #     wrgb = int(row.iloc[0]['wrgb'])
+        #     si_io = wrgb * 32  # 256 bit
+        #     tsv_io = (wrgb + mvsb + mvgb) * 32
+        #     giomux_io = (wrgb + mvsb + mvgb) * 32
+        #     bgmux_io = (wrgb + mvsb + mvgb) * 32
+        #     mem_acc = mac * 32
+        #     if pim_type == PIMType.BA:
+        #         # pCH * Rank * bank group * bank
+        #         mem_acc *= 2 * 2 * 4 * 4
+        #     elif pim_type == PIMType.BG:
+        #         # pCH * Rank * bank group
+        #         mem_acc *= 2 * 2 * 4
+        #     else:
+        #         mem_acc *= 2
 
-            ## si, tsv, giomux to bgmux, bgmux to column decoder, bank RD
-            traffic = [si_io, tsv_io, giomux_io, bgmux_io, mem_acc]
-            traffic = [i * self.num_hbm for i in traffic]
-            traffic = [i * num_ops_group for i in traffic]
-            exec_time = self.tCK * cycle / 1000 / 1000 / 1000  # ns -> s
-            exec_time *= num_ops_group
-            return exec_time, traffic
+        #     ## si, tsv, giomux to bgmux, bgmux to column decoder, bank RD
+        #     traffic = [si_io, tsv_io, giomux_io, bgmux_io, mem_acc]
+        #     traffic = [i * self.num_hbm for i in traffic]
+        #     traffic = [i * num_ops_group for i in traffic]
+        #     exec_time = self.tCK * cycle / 1000 / 1000 / 1000  # ns -> s
+        #     exec_time *= num_ops_group
+        #     return exec_time, traffic

@@ -428,7 +428,8 @@ class System:
             comm_energy = sum([v['comm'] for k, v in gen_energies.items()])
             energies.append(comm_energy)
 
-            energies = [i / (lout - 1) for i in energies]
+            if lout > 1:
+                energies = [i / (lout - 1) for i in energies]
 
             perf = list(s_perf.values()) + list(g_perf.values())
 
@@ -456,8 +457,9 @@ class System:
                 perf_all = [v + perf[i] for i, v in enumerate(perf_all)]
                 energy_all = [v + energy[i] for i, v in enumerate(energy_all)]
 
-        s_flops = s_flops * self.model.ndec / (lout - 1)
-        g_flops = g_flops * self.model.ndec / (lout - 1)
+        if lout > 1:
+            s_flops = s_flops * self.model.ndec / (lout - 1)
+            g_flops = g_flops * self.model.ndec / (lout - 1)
 
         ## Concat tag
         cap = self.devices['GPU'].aggregate_memory_capacity

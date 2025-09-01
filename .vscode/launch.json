@@ -10,9 +10,9 @@
             "args": [
                 "--dhead", "128", 
                 "--nhead", "3", 
-                "--seqlen", "2048",
+                "--seqlen", "2049",
                 "--dbyte", "2", 
-                "--output", "gen_trace_output_attacc_l2048_nattn3_dhead128_dbyte2_pc1.trace"
+                "--output", "gen_trace_output_attacc_l2049_nattn3_dhead128_dbyte2_pc1.trace"
             ]
         },
         {
@@ -24,7 +24,7 @@
             "args": [
                 "--dhead", "128", 
                 "--nhead", "615", 
-                "--seqlen", "2048",
+                "--seqlen", "2049",
                 "--dbyte", "2", 
                 "--output", "gen_trace_output_attacc_l2048_nattn615_dhead128_dbyte2_pc1.trace"
             ]

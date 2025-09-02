@@ -52,15 +52,15 @@ def run(system: System,
           format(batch, lin, lout, pipe, parallel))
     assert system.model_set, "Need to SetModel"
     perfs = []
-    system.simulate(batch,
-                    lin,
-                    lout,
-                    perfs=perfs,
-                    pipe=pipe,
-                    parallel_ff=parallel,
-                    power_constraint=power_constraint)
-    # system.simulate_base_test(batch, lin, lout)
-    # system.simulate_lora_test(batch, lin, lout)
+    # system.simulate(batch,
+    #                 lin,
+    #                 lout,
+    #                 perfs=perfs,
+    #                 pipe=pipe,
+    #                 parallel_ff=parallel,
+    #                 power_constraint=power_constraint)
+    system.simulate_GEMM_test(batch, lin, lout)
+    # system.simulate_simple_lora_test(batch, lin, lout)
     if output_file is not None:
         write_csv(output_file, perfs)
 

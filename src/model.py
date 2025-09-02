@@ -254,7 +254,7 @@ class Transformer:
             Layer('sum', 'norm2', LayerType.NORM, False, self.dtype, batch * lin,
                   self.hdim, 1, 1))
         # Generation
-        for stage in range(0, lout, 1):
+        for stage in range(1, lout, 1):
             decoder = []
             decoder.append(
                 Layer('gen', 'qkv', LayerType.FC, True, self.dtype, batch,

@@ -322,14 +322,14 @@ class PIM:
         ) / 2 * self.energy_table['alu'] * self.num_attacc
 
         return [e_off, 0, 0, 0, e_flop, 0]
-
+            
     def get_time_and_energy(self, layer: Layer):
         if layer.type == LayerType.X2G:
             return self._io_time_energy(layer)
 
-        elif layer.type == LayerType.MATMUL or layer.type == LayerType.FC:
+        elif layer.type == LayerType.MATMUL:
             ## operational granularity = the attention layer
-            if 'score' in layer.name or 'context' in layer.name:
+            if 'score' in layer.name:
                 m, n, k, numOp, dbyte = layer.get_infos()
                 time, traffic = self.ramulator.output(
                     self.pim_type, layer, self.power_constraint)
@@ -346,6 +346,8 @@ class PIM:
                 energies = [i * self.num_attacc for i in energies]
 
                 return time, energies
+            elif 'qkv' in layer.name:
+                return 0, [0, 0, 0, 0, 0, 0]
             else:
                 return 0, [0, 0, 0, 0, 0, 0]
 

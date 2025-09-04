@@ -36,9 +36,9 @@
             "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_GEMMV_bank.py",
             "console": "integratedTerminal",
             "args": [
-                "--dhead", "12288",
-                "--nhead", "410", 
-                "--seqlen", "12288",
+                "-m", "410", 
+                "-k", "12288",
+                "-n", "12288",
                 "--dbyte", "2", 
                 "--output", "gen_attacc_l12288_nattn410_dhead128_dbyte2_pc1.trace"
             ]

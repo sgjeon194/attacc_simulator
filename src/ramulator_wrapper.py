@@ -98,19 +98,19 @@ class Ramulator:
 
         if layer.type == LayerType.FC:
             trace_generator = "trace_gen/gen_trace_GEMMV_bank.py"
-            trace_args = "--m {} --k {} --n {} --dbyte {} --output {}".format(
-                num_ops_per_hbm, layer.k, layer.n, dbyte, trace_file)
+            k = layer.k
         else:
             trace_generator = "trace_gen/gen_trace_attacc_{}.py".format(pim_type_name)
-            trace_args = "--dhead {} --nhead {} --seqlen {} --dbyte {} --output {}".format(
-                self.dhead, num_ops_per_hbm, layer.n, dbyte, trace_file)
-        
+            k = self.dhead
+            
         trace_exc = os.path.join(
             self.ramulator_dir,
             trace_generator)
-        
+        trace_args = "--dhead {} --nhead {} --seqlen {} --dbyte {} --output {}".format(
+            k, num_ops_per_hbm, layer.n, dbyte, trace_file)
+
         gen_trace_cmd = f"python {trace_exc} {trace_args}"
-            
+
         # generate trace
         try:
             os.system(gen_trace_cmd)
@@ -173,10 +173,8 @@ class Ramulator:
                 num_ops_group = math.ceil(num_ops_per_hbm / minimum_heads)
                 num_ops_per_hbm = minimum_heads
 
-            # file_name = "attacc_l{}_nattn{}_dhead{}_dbyte{}_pc{}".format(
-            #     l, num_ops_per_hbm, dhead, layer.dbyte, int(power_constraint))
-            file_name = "attacc_m{}_k{}_n{}_dbyte{}_pc{}".format(
-                num_ops_per_hbm, layer.k, layer.n, layer.dbyte, int(power_constraint))
+            file_name = "attacc_l{}_nattn{}_dhead{}_dbyte{}_pc{}".format(
+                l, num_ops_per_hbm, dhead, layer.dbyte, int(power_constraint))
             yaml_file = os.path.join(self.ramulator_dir, file_name + '.yaml')
             self.make_yaml_file(yaml_file, file_name, power_constraint)
 

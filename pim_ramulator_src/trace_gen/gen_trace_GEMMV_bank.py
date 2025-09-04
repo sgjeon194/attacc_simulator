@@ -8,6 +8,7 @@ model = "gpt-3-175B"
 k = 12288
 n = 12288
 
+dhead = 128
 max_L = 2048
 data_size = 16  # FP 16
 
@@ -62,20 +63,20 @@ def cmd_list_reset():
     valid_channel = []
 
 
-def lora(n, key_addr, val_addr, itr, valid_channel=n_channel):
+def lora(L, key_addr, val_addr, itr, valid_channel=n_channel):
     cmd_score_wrgb.append([])
     cmd_score_mac.append([])
 
     valid_channels.append(valid_channel)
 
-    def score_cpvec(addr_offset, n):
+    def score_cpvec(addr_offset, L):
         ## (pCH) C, C, R, R (MAC)
         ## write input vector to gemv buffer
         # number of partition = (R parallel units)
 
         # Data broadcasting for pch, rank, bg, and ba
         for ba_idx in range(n_bank):  # number of partitions
-            for col_idx in range(math.ceil(k / n_bank / n_mac)):
+            for col_idx in range(math.ceil(dhead / n_bank / n_mac)):
                 for lch in range(math.ceil(valid_channel)):
                     # GEMV buffer address, col granularity = 1
                     addr = (
@@ -87,15 +88,15 @@ def lora(n, key_addr, val_addr, itr, valid_channel=n_channel):
                     hex_addr = hex(addr)[2:]
                     cmd_score_wrgb[itr].append("PIM_WR_GB 0x{0:0>8}".format(hex_addr))
 
-    def score_mac(addr_offset, n):
+    def score_mac(addr_offset, L):
         ## (pCH) C, C, R, R (MAC)
         # MAC and move output vector to softmax buffer
         ## Vector (1 x k) x Matrix (k x n) multiplication
         ## GEMV unit = adder tree mode
-        for n_idx in range(math.ceil(n / n_pch / n_rank / n_bg)):  # 16
+        for n_idx in range(math.ceil(L / n_pch / n_rank / n_bg)):  # 16
             cmd_score_mac[itr].append([])
-            for k_idx in range(math.ceil(k / n_bank / n_mac)):  # 2
-                idx = k_idx + n_idx * math.ceil(k / n_bank / n_mac)
+            for k_idx in range(math.ceil(dhead / n_bank / n_mac)):  # 2
+                idx = k_idx + n_idx * math.ceil(dhead / n_bank / n_mac)
 
                 # All bank command (legacy channel)
                 for lch in range(math.ceil(valid_channel)):
@@ -105,30 +106,30 @@ def lora(n, key_addr, val_addr, itr, valid_channel=n_channel):
                         "PIM_MAC_AB 0x{0:0>8}".format(hex_addr)
                     )
 
-    score_cpvec(key_addr, n)
+    score_cpvec(key_addr, L)
 
-    score_mac(key_addr, n)
+    score_mac(key_addr, L)
 
 
 # n_head and n_req = n_req per a HBM
-def run_lora(m, k, n, trace_file_name): 
-    partition_size = math.ceil(max_L * k / (n_pch * n_rank * n_bg * n_bank))
+def run_lora(dhead, n_head_per_hbm, L, trace_file_name):
+    partition_size = math.ceil(max_L * dhead / (n_pch * n_rank * n_bg * n_bank))
     head_offset = partition_size
     v_offset = pow(2, 23)
 
     cmd_list_reset()
     ##-- Generate Commands --##
-    num_itr = math.ceil(m / (n_channel))
+    num_itr = math.ceil(n_head_per_hbm / (n_channel))
     for itr in range(num_itr):
         remainder = 0
-        if m / ((itr + 1) * n_channel) < 1:
-            remainder = m % n_channel
+        if n_head_per_hbm / ((itr + 1) * n_channel) < 1:
+            remainder = n_head_per_hbm % n_channel
         key_addr = itr * partition_size
         val_addr = key_addr + v_offset
         if remainder == 0:
-            lora(n, key_addr, val_addr, itr)
+            lora(L, key_addr, val_addr, itr)
         else:
-            lora(n, key_addr, val_addr, itr, remainder)
+            lora(L, key_addr, val_addr, itr, remainder)
 
     ##-- Ovelapping Commands --##
     barrier = []
@@ -149,37 +150,37 @@ def run_lora(m, k, n, trace_file_name):
             ## BARRIER
         total_cmd += barrier
 
-        length = math.ceil(n/n_pch/n_rank/n_bg/16)
+        length = math.ceil(L/n_pch/n_rank/n_bg/16)
         for j in range(0, length+1):
             ## MAC (Head0)
             if not j == length:
                 stride = 16;
-                for k_idx in range(stride):
-                    if (j*stride+k_idx) >= len(cmd_score_mac[i]):
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_mac[i]):
                         break;
-                    total_cmd += cmd_score_mac[i][j*stride+k_idx]
+                    total_cmd += cmd_score_mac[i][j*stride+k]
 
             ## WRGB (Head1)
             if not j == length:
-                stride = int(n_bank*math.ceil(k/n_bank /n_mac)*math.ceil(valid_channels[i+1])/length);
-                for k_idx in range(stride):
-                    if (j*stride+k_idx) >= len(cmd_score_wrgb[i+1]):
+                stride = int(n_bank*math.ceil(dhead /n_bank /n_mac)*math.ceil(valid_channels[i+1])/length);
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_wrgb[i+1]):
                         break;
-                    total_cmd.append(cmd_score_wrgb[i+1][j*stride + k_idx])
+                    total_cmd.append(cmd_score_wrgb[i+1][j*stride + k])
             ## BARRIER
             if not j == length:
                 total_cmd += barrier
 
         # Head0: SoftMax, Head1: Score
-        length = math.ceil(n/n_pch/n_rank/n_bg/16)
+        length = math.ceil(L/n_pch/n_rank/n_bg/16)
         for j in range(0, length+1):
             ## MAC (Head1)
             if not j == length:
                 stride = 16;
-                for k_idx in range(stride):
-                    if (j*stride+k_idx) >= len(cmd_score_mac[i+1]):
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_mac[i+1]):
                         break;
-                    total_cmd += cmd_score_mac[i+1][j*stride+k_idx]
+                    total_cmd += cmd_score_mac[i+1][j*stride+k]
 
     if num_itr % 2 != 0:
         i = num_itr - 1
@@ -190,15 +191,15 @@ def run_lora(m, k, n, trace_file_name):
             ## BARRIER
         total_cmd += barrier
 
-        length = math.ceil(n/n_pch/n_rank/n_bg/16)
+        length = math.ceil(L/n_pch/n_rank/n_bg/16)
         for j in range(0, length+1):
             ## MAC
             if not j == length:
                 stride = 16;
-                for k_idx in range(stride):
-                    if (j*stride+k_idx) >= len(cmd_score_mac[i]):
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_mac[i]):
                         break;
-                    total_cmd += cmd_score_mac[i][j*stride+k_idx]
+                    total_cmd += cmd_score_mac[i][j*stride+k]
             
             ## BARRIER
             if not j == length:
@@ -212,24 +213,28 @@ def run_lora(m, k, n, trace_file_name):
 
 
 def main():
-    global m, k, n, max_L, data_size, n_mac
-    
+    global dhead, max_L, data_size, n_mac
+
     parser = argparse.ArgumentParser(
         description="Output path and operation infos",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     parser.add_argument(
-        "-m", "--row", type=int, default=1, help="num of GEMVs for 1 hbm, default=1"
+        "-dh", "--dhead", type=int, default=128, help="dhead, default= 128"
     )
     parser.add_argument(
-        "-k", "--hiddensize", type=int, default=4096, help="layer hidden size, default=4096"
+        "-nh", "--nhead", type=int, default=64, help="Number of heads, default=64"
     )
     parser.add_argument(
-        "-n", "--col", type=int, default=4096, help="Result col num, default=4096",
+        "-l",
+        "--seqlen",
+        type=int,
+        default=2048,
+        help="Sequence length L, default= 2048",
     )
     parser.add_argument(
-        "-maxl", "--maxlen", type=int, default=4096, help="maximum len, default= 4096"
+        "-maxl", "--maxlen", type=int, default=4096, help="maximum L, default= 4096"
     )
     parser.add_argument(
         "-db", "--dbyte", type=int, default=2, help="data type (B), default= 2"
@@ -240,10 +245,10 @@ def main():
 
     args = parser.parse_args()
 
-    m = args.row # n_head_per_hbm
-    k = args.hiddensize # dhead
-    n = args.col # L
+    dhead = args.dhead
     max_L = args.maxlen
+    L = args.seqlen
+    n_head_per_hbm = args.nhead
 
     data_size = args.dbyte
     n_mac = int(HBM_GS["col"] / data_size)
@@ -256,7 +261,7 @@ def main():
         print(f"     {key}: {value}")
     print("---------------------------------------------------")
     
-    run_lora(m, k, n, args.output)
+    run_lora(dhead, n_head_per_hbm, L, args.output)
 
 
 if __name__ == "__main__":

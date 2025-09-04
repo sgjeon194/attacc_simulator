@@ -69,13 +69,13 @@ class System:
         print(f"    m = {GEMM_gpu_layer.m}, k = {GEMM_gpu_layer.k}, n = {GEMM_gpu_layer.n}, numOPs = {GEMM_gpu_layer.numOp}")
         print(f"    Time: {GEMM_gpu_time * 1000 * 1000} us, Energy: {GEMM_gpu_energy} nJ")
         
-        # GEMM_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
-        #         1, self.model.hdim, self.model.hdim, batch_size * lin)
+        GEMM_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+                1, self.model.hdim, self.model.hdim, batch_size * lin)
         
-        # GEMM_pim_time, GEMM_pim_energy = self.devices['Acc'].get_time_and_energy(GEMM_pim_layer)
-        # print(f"GEMM on pim")
-        # print(f"    m = {GEMM_pim_layer.m}, k = {GEMM_pim_layer.k}, n = {GEMM_pim_layer.n}, numOPs = {GEMM_pim_layer.numOp}")
-        # print(f"    Time: {GEMM_pim_time * 1000 * 1000} us, Energy: {GEMM_pim_energy} nJ")
+        GEMM_pim_time, GEMM_pim_energy = self.devices['Acc'].get_time_and_energy(GEMM_pim_layer)
+        print(f"GEMM on pim")
+        print(f"    m = {GEMM_pim_layer.m}, k = {GEMM_pim_layer.k}, n = {GEMM_pim_layer.n}, numOPs = {GEMM_pim_layer.numOp}")
+        print(f"    Time: {GEMM_pim_time * 1000 * 1000} us, Energy: {GEMM_pim_energy} nJ")
         
         
     def simulate_lora_test(self, batch_size, lin, lout):

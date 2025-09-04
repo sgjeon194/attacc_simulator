@@ -90,17 +90,24 @@ class Ramulator:
         self.df.to_csv(self.output_log, index=False)
 
     #def run_ramulator(self):
-    def run_ramulator(self, pim_type: PIMType, l, num_ops_per_hbm, dbyte,
+    def run_ramulator(self, pim_type: PIMType, layer:Layer, num_ops_per_hbm, dbyte,
                       yaml_file, file_name):
         pim_type_name = pim_type.name.lower(
         ) if not pim_type == PIMType.BA else "bank"
         trace_file = os.path.join(self.ramulator_dir, file_name + '.trace')
 
+        if layer.type == LayerType.FC:
+            trace_generator = "trace_gen/gen_trace_GEMMV_bank.py"
+            k = layer.k
+        else:
+            trace_generator = "trace_gen/gen_trace_attacc_{}.py".format(pim_type_name)
+            k = self.dhead
+            
         trace_exc = os.path.join(
             self.ramulator_dir,
-            "trace_gen/gen_trace_attacc_{}.py".format(pim_type_name))
+            trace_generator)
         trace_args = "--dhead {} --nhead {} --seqlen {} --dbyte {} --output {}".format(
-            self.dhead, num_ops_per_hbm, l, dbyte, trace_file)
+            k, num_ops_per_hbm, layer.n, dbyte, trace_file)
 
         gen_trace_cmd = f"python {trace_exc} {trace_args}"
 
@@ -115,7 +122,6 @@ class Ramulator:
         run_ramulator_cmd = f"{ramulator_file} -f {yaml_file}"
         try:
             result = subprocess.run(run_ramulator_cmd,
-                                    stdout=subprocess.PIPE,
                                     text=True,
                                     shell=True)
             output_lines = result.stdout.strip().split('\n')
@@ -172,7 +178,7 @@ class Ramulator:
             yaml_file = os.path.join(self.ramulator_dir, file_name + '.yaml')
             self.make_yaml_file(yaml_file, file_name, power_constraint)
 
-            result = self.run_ramulator(pim_type, l, num_ops_per_hbm,
+            result = self.run_ramulator(pim_type, layer, num_ops_per_hbm,
                                         layer.dbyte, yaml_file, file_name)
 
             # remove trace
@@ -236,34 +242,34 @@ class Ramulator:
                       (self.df['dbyte'] == dbyte) & (self.df['dhead'] == dhead) & \
                       (self.df['power_constraint'] == power_constraint) &  \
                       (self.df['pim_type'] == pim_type.name)]
-        # if row.empty:
-        return self.run(pim_type, layer, power_constraint)
+        if row.empty:
+            return self.run(pim_type, layer, power_constraint)
 
-        # else:
-        #     cycle = int(row.iloc[0]['cycle'])
-        #     mac = int(row.iloc[0]['mac'])
-        #     softmax = int(row.iloc[0]['softmax'])
-        #     mvgb = int(row.iloc[0]['mvgb'])
-        #     mvsb = int(row.iloc[0]['mvsb'])
-        #     wrgb = int(row.iloc[0]['wrgb'])
-        #     si_io = wrgb * 32  # 256 bit
-        #     tsv_io = (wrgb + mvsb + mvgb) * 32
-        #     giomux_io = (wrgb + mvsb + mvgb) * 32
-        #     bgmux_io = (wrgb + mvsb + mvgb) * 32
-        #     mem_acc = mac * 32
-        #     if pim_type == PIMType.BA:
-        #         # pCH * Rank * bank group * bank
-        #         mem_acc *= 2 * 2 * 4 * 4
-        #     elif pim_type == PIMType.BG:
-        #         # pCH * Rank * bank group
-        #         mem_acc *= 2 * 2 * 4
-        #     else:
-        #         mem_acc *= 2
+        else:
+            cycle = int(row.iloc[0]['cycle'])
+            mac = int(row.iloc[0]['mac'])
+            softmax = int(row.iloc[0]['softmax'])
+            mvgb = int(row.iloc[0]['mvgb'])
+            mvsb = int(row.iloc[0]['mvsb'])
+            wrgb = int(row.iloc[0]['wrgb'])
+            si_io = wrgb * 32  # 256 bit
+            tsv_io = (wrgb + mvsb + mvgb) * 32
+            giomux_io = (wrgb + mvsb + mvgb) * 32
+            bgmux_io = (wrgb + mvsb + mvgb) * 32
+            mem_acc = mac * 32
+            if pim_type == PIMType.BA:
+                # pCH * Rank * bank group * bank
+                mem_acc *= 2 * 2 * 4 * 4
+            elif pim_type == PIMType.BG:
+                # pCH * Rank * bank group
+                mem_acc *= 2 * 2 * 4
+            else:
+                mem_acc *= 2
 
-        #     ## si, tsv, giomux to bgmux, bgmux to column decoder, bank RD
-        #     traffic = [si_io, tsv_io, giomux_io, bgmux_io, mem_acc]
-        #     traffic = [i * self.num_hbm for i in traffic]
-        #     traffic = [i * num_ops_group for i in traffic]
-        #     exec_time = self.tCK * cycle / 1000 / 1000 / 1000  # ns -> s
-        #     exec_time *= num_ops_group
-        #     return exec_time, traffic
+            ## si, tsv, giomux to bgmux, bgmux to column decoder, bank RD
+            traffic = [si_io, tsv_io, giomux_io, bgmux_io, mem_acc]
+            traffic = [i * self.num_hbm for i in traffic]
+            traffic = [i * num_ops_group for i in traffic]
+            exec_time = self.tCK * cycle / 1000 / 1000 / 1000  # ns -> s
+            exec_time *= num_ops_group
+            return exec_time, traffic

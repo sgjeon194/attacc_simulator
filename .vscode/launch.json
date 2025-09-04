@@ -30,17 +30,17 @@
             ]
         },
         {
-            "name": "Python: Debug lora trace gen",
+            "name": "Python: Debug GEMM trace gen",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_attacc_bank.py",
+            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_GEMMV_bank.py",
             "console": "integratedTerminal",
             "args": [
-                "--dhead", "128",
-                "--nhead", "52", 
-                "--seqlen", "32",
+                "--dhead", "12288",
+                "--nhead", "410", 
+                "--seqlen", "12288",
                 "--dbyte", "2", 
-                "--output", "gen_trace_output_attacc_l32_nattn52_dhead128_dbyte2_pc1.trace"
+                "--output", "gen_attacc_l12288_nattn410_dhead128_dbyte2_pc1.trace"
             ]
         },
         {

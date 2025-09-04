@@ -5,6 +5,9 @@ import numpy as np
 
 model = "gpt-3-175B"
 
+k = 12288
+n = 12288
+
 dhead = 128
 max_L = 2048
 data_size = 16  # FP 16
@@ -49,11 +52,6 @@ HBM_GS["attacc"] = max_n_hbm * HBM_GS["hbm"]
 
 cmd_score_wrgb = []
 cmd_score_mac = []
-cmd_score_mvsb = []
-cmd_sfm = []
-cmd_context_mvgb = []
-cmd_context_mac = []
-cmd_context_mvsb = []
 
 valid_channels = []
 
@@ -61,11 +59,6 @@ valid_channels = []
 def cmd_list_reset():
     cmd_score_wrgb = []
     cmd_score_mac = []
-    cmd_score_mvsb = []
-    cmd_sfm = []
-    cmd_context_mvgb = []
-    cmd_context_mac = []
-    cmd_context_mvsb = []
 
     valid_channel = []
 
@@ -112,26 +105,6 @@ def lora(L, key_addr, val_addr, itr, valid_channel=n_channel):
                     cmd_score_mac[itr][-1].append(
                         "PIM_MAC_AB 0x{0:0>8}".format(hex_addr)
                     )
-                ## parallelization
-
-            ## MVSB command (Move to Softmax buffer)
-            ## A output element is generated for every n_idx
-            if n_idx % 16 == 15 or n_idx == math.ceil(L / n_pch / n_rank / n_bg) - 1:
-                cmd_score_mvsb[itr].append([])
-                for bg_idx in range(n_bg):
-                    for rank in range(n_rank):
-                        for lch in range(math.ceil(valid_channel)):
-                            bank_addr = (
-                                addr_offset
-                                + lch * HBM_GS["ch"]
-                                + rank * HBM_GS["rank"]
-                                + bg_idx * HBM_GS["bg"]
-                            )
-                            hex_addr = hex(bank_addr)[2:]
-                            cmd_score_mvsb[itr][-1].append(
-                                "PIM_MV_SB 0x{0:0>8}".format(hex_addr)
-                            )
-
 
     score_cpvec(key_addr, L)
 
@@ -158,9 +131,81 @@ def run_lora(dhead, n_head_per_hbm, L, trace_file_name):
         else:
             lora(L, key_addr, val_addr, itr, remainder)
 
+    ##-- Ovelapping Commands --##
+    barrier = []
+    for lch in range(n_channel):
+        addr = lch * HBM_GS['ch']
+        hex_addr = hex(addr)[2:]
+        barrier.append("PIM_BARRIER 0x{0:0>8}".format(hex_addr))
+
     total_cmd = []
-    
-    trace_file = open(trace_file_name, "w")
+    for i in range(0, num_itr - 1, 2):
+        # Head0: Score
+            ## WRGB
+        total_cmd += cmd_score_wrgb[i]
+            ## dummy MAC
+        if i == 0:
+            for j in range(valid_channels[i]):
+                total_cmd.append(cmd_score_mac[i][0][j])
+            ## BARRIER
+        total_cmd += barrier
+
+        length = math.ceil(L/n_pch/n_rank/n_bg/16)
+        for j in range(0, length+1):
+            ## MAC (Head0)
+            if not j == length:
+                stride = 16;
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_mac[i]):
+                        break;
+                    total_cmd += cmd_score_mac[i][j*stride+k]
+
+            ## WRGB (Head1)
+            if not j == length:
+                stride = int(n_bank*math.ceil(dhead /n_bank /n_mac)*math.ceil(valid_channels[i+1])/length);
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_wrgb[i+1]):
+                        break;
+                    total_cmd.append(cmd_score_wrgb[i+1][j*stride + k])
+            ## BARRIER
+            if not j == length:
+                total_cmd += barrier
+
+        # Head0: SoftMax, Head1: Score
+        length = math.ceil(L/n_pch/n_rank/n_bg/16)
+        for j in range(0, length+1):
+            ## MAC (Head1)
+            if not j == length:
+                stride = 16;
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_mac[i+1]):
+                        break;
+                    total_cmd += cmd_score_mac[i+1][j*stride+k]
+
+    if num_itr % 2 != 0:
+        i = num_itr - 1
+
+        # Score
+            ## WRGB
+        total_cmd += cmd_score_wrgb[i]
+            ## BARRIER
+        total_cmd += barrier
+
+        length = math.ceil(L/n_pch/n_rank/n_bg/16)
+        for j in range(0, length+1):
+            ## MAC
+            if not j == length:
+                stride = 16;
+                for k in range(stride):
+                    if (j*stride+k) >= len(cmd_score_mac[i]):
+                        break;
+                    total_cmd += cmd_score_mac[i][j*stride+k]
+            
+            ## BARRIER
+            if not j == length:
+                total_cmd += barrier
+
+    trace_file = open(trace_file_name, 'w')
     for cmd in total_cmd:
         trace_file.write(cmd + "\n")
 

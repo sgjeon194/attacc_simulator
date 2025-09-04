@@ -95,6 +95,94 @@ class Transformer:
         self.dhead = int(self.hdim / self.num_heads)
         self.tp = tensor_parallel
 
+    def build_lora_test(self, batch, lin, lout, attn_on_hetero=False):
+        self.sum_decoder = []
+        self.gen_decoder = []
+        
+        # self.sum_decoder.append(
+        #     Layer('sum', 'qlora', LayerType.FC, True, self.dtype, lin,
+        #           int(32 / self.tp), self.hdim, batch))
+        
+        for stage in range(1, lout, 1):
+            decoder = []
+            decoder.append(
+                Layer('sum', 'score', LayerType.MATMUL, True, self.dtype, lin,
+                    int(32 / self.tp), self.hdim, batch))            
+            
+            decoder.append(
+                Layer('gen', 'score', LayerType.MATMUL, True, self.dtype, 1,
+                    int(32 / self.tp), self.hdim, batch))
+            
+            self.gen_decoder.append(copy.deepcopy(decoder))
+        
+    def build_pim(self, batch, lin, lout):
+        self.sum_decoder = []
+        self.gen_decoder = []
+
+        # Summarization
+        self.sum_decoder.append(
+            Layer('sum', 'qkv', LayerType.FC, True, self.dtype, batch * lin,
+                  3 * int(self.hdim / self.tp), self.hdim, 1))
+        self.sum_decoder.append(
+            Layer('sum', 'score', LayerType.MATMUL, False, self.dtype, lin,
+                  lin, self.dhead,
+                  int(self.num_heads / self.tp) * batch))
+        self.sum_decoder.append(
+            Layer('sum', 'softmax', LayerType.SOFTMAX, False, self.dtype, lin,
+                  lin, 1,
+                  int(self.num_heads / self.tp) * batch))
+        self.sum_decoder.append(
+            Layer('sum', 'context', LayerType.MATMUL, False, self.dtype, lin,
+                  self.dhead, lin,
+                  int(self.num_heads / self.tp) * batch))
+        self.sum_decoder.append(
+            Layer('sum', 'proj', LayerType.FC, True, self.dtype, batch * lin,
+                  self.hdim, int(self.hdim / self.tp), 1))
+        self.sum_decoder.append(
+            Layer('sum', 'comm_g2g', LayerType.G2G, False, self.dtype, batch * lin,
+                  self.hdim, 1, 1))
+        self.sum_decoder.append(
+            Layer('sum', 'norm1', LayerType.NORM, False, self.dtype, batch * lin,
+                  self.hdim, 1, 1))
+        if 'LLAMA' in self.name:
+            self.sum_decoder.append(
+                Layer('sum', 'ff1', LayerType.FC, True, self.dtype, batch * lin,
+                      self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
+            self.sum_decoder.append(
+                Layer('sum', 'ff2', LayerType.FC, True, self.dtype, batch * lin,
+                      self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
+            self.sum_decoder.append(
+                Layer('sum', 'glu', LayerType.ACT, False, self.dtype, batch * lin,
+                      self.ff_scale * int(self.hdim / self.tp), 1, 1))
+            self.sum_decoder.append(
+                Layer('sum', 'ff3', LayerType.FC, True, self.dtype, batch * lin,
+                      self.hdim, self.ff_scale * int(self.hdim / self.tp), 1))
+        else:
+            self.sum_decoder.append(
+                Layer('sum', 'ff1', LayerType.FC, True, self.dtype, batch * lin,
+                      self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
+            if 'OPT' in self.name:
+                self.sum_decoder.append(
+                    Layer('sum', 'relu', LayerType.ACT, False,
+                          self.dtype, batch * lin,
+                          self.ff_scale * int(self.hdim / self.tp), 1, 1))
+            else:
+                self.sum_decoder.append(
+                    Layer('sum', 'gelu', LayerType.ACT, False,
+                          self.dtype, batch * lin,
+                          self.ff_scale * int(self.hdim / self.tp), 1, 1))
+            self.sum_decoder.append(
+                Layer('sum', 'ff2', LayerType.FC, True, self.dtype, batch * lin,
+                      self.hdim, self.ff_scale * int(self.hdim / self.tp), 1))
+        self.sum_decoder.append(
+            Layer('sum', 'comm_g2g', LayerType.G2G, False, self.dtype, batch * lin,
+                  self.hdim, 1, 1))
+        self.sum_decoder.append(
+            Layer('sum', 'norm2', LayerType.NORM, False, self.dtype, batch * lin,
+                  self.hdim, 1, 1))
+
+
+
     def build(self, batch, lin, lout, attn_on_hetero=False):
         self.sum_decoder = []
         self.gen_decoder = []

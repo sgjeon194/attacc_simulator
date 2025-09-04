@@ -58,6 +58,57 @@ class System:
         self.devices['GPU'] = self.GPU
         self.devices['Acc'] = self.GPU
         self.model.tp = self.GPU.num_xpu
+        
+        
+    def simulate_GEMM_test(self, batch_size, lin, lout):
+        GEMM_gpu_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+                batch_size * lin, self.model.hdim, self.model.hdim, 1) 
+        
+        GEMM_gpu_time, GEMM_gpu_energy = self.devices['GPU'].get_time_and_energy(GEMM_gpu_layer)
+        print(f"GEMM on GPU")
+        print(f"    m = {GEMM_gpu_layer.m}, k = {GEMM_gpu_layer.k}, n = {GEMM_gpu_layer.n}, numOPs = {GEMM_gpu_layer.numOp}")
+        print(f"    Time: {GEMM_gpu_time * 1000 * 1000} us, Energy: {GEMM_gpu_energy} nJ")
+        
+        # GEMM_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+        #         1, self.model.hdim, self.model.hdim, batch_size * lin)
+        
+        # GEMM_pim_time, GEMM_pim_energy = self.devices['Acc'].get_time_and_energy(GEMM_pim_layer)
+        # print(f"GEMM on pim")
+        # print(f"    m = {GEMM_pim_layer.m}, k = {GEMM_pim_layer.k}, n = {GEMM_pim_layer.n}, numOPs = {GEMM_pim_layer.numOp}")
+        # print(f"    Time: {GEMM_pim_time * 1000 * 1000} us, Energy: {GEMM_pim_energy} nJ")
+        
+        
+    def simulate_lora_test(self, batch_size, lin, lout):
+        prefill_gpu_layer = Layer('sum', 'score', LayerType.FC, True, self.model.dtype, 
+                lin, int(32 / self.model.tp), self.model.hdim, batch_size) 
+        prefill_pim_layer = Layer('sum', 'score', LayerType.FC, True, self.model.dtype, 
+                1, 32, self.model.hdim, int(lin*batch_size))
+        
+        decode_gpu_layer = Layer('gen', 'score', LayerType.FC, True, self.model.dtype, 
+                1, int(32 / self.model.tp), self.model.hdim, int(batch_size))
+        decode_pim_layer = Layer('gen', 'score', LayerType.FC, True, self.model.dtype, 
+                1, 32, self.model.hdim, int(batch_size))
+           
+        # prefiil_gpu_time, prefill_gpu_energy = self.devices['GPU'].get_time_and_energy(prefill_gpu_layer)
+        # prefiil_pim_time, prefill_pim_energy = self.devices['Acc'].get_time_and_energy(prefill_pim_layer)
+        
+        decode_gpu_time, decode_gpu_energy = self.devices['GPU'].get_time_and_energy(decode_gpu_layer)
+        decode_pim_time, decode_pim_energy = self.devices['Acc'].get_time_and_energy(decode_pim_layer)
+
+        # print(f"Prefill(GEMM) on GPU")
+        # print(f"    m = {prefill_gpu_layer.m}, k = {prefill_gpu_layer.k}, n = {prefill_gpu_layer.n}, numOPs = {prefill_gpu_layer.numOp}")
+        # print(f"    Time: {prefiil_gpu_time * 1000 * 1000} us, Energy: {prefill_gpu_energy} nJ")
+        # print(f"Prefill(GEMM) on PIM")
+        # print(f"    m = {prefill_pim_layer.m}, k = {prefill_pim_layer.k}, n = {prefill_pim_layer.n}, numOPs = {prefill_pim_layer.numOp}")
+        # print(f"    Time: {prefiil_pim_time * 1000 * 1000} us, Energy: {prefill_pim_energy} nJ")
+        
+        print(f"Decode(GEMM) on GPU")
+        print(f"    m = {decode_gpu_layer.m}, k = {decode_gpu_layer.k}, n = {decode_gpu_layer.n}, numOPs = {decode_gpu_layer.numOp}")
+        print(f"    Time: {decode_gpu_time * 1000 * 1000} us, Energy: {decode_gpu_energy} nJ")
+        print(f"Decode(GEMV) on PIM")
+        print(f"    m = {decode_pim_layer.m}, k = {decode_pim_layer.k}, n = {decode_pim_layer.n}, numOPs = {decode_pim_layer.numOp}")
+        print(f"    Time: {decode_pim_time * 1000 * 1000} us, Energy: {decode_pim_energy} nJ")
+        
 
     def simulate(self,
                  batch_size,
@@ -189,6 +240,8 @@ class System:
         assert self.model_set, "Need to set_model"
         self.model.build(batch_size, lin, lout, self.hetero_name
                          in [DeviceType.CPU, DeviceType.PIM])
+        # self.model.build_lora_test(batch_size, lin, lout, self.hetero_name
+        #                  in [DeviceType.CPU, DeviceType.PIM])
         second_batch_size = num_reqs % batch_size
         num_batches = 1
         target_bs = [batch_size]
@@ -250,7 +303,6 @@ class System:
                         print(f"{layer.name} GPU")
                         exec_time, energy = self.devices['GPU'].get_time_and_energy(layer)
                     print(f"    time : {exec_time}, energy : {energy}")
-                    
                     layer.exec_time = exec_time
                     layer.energy = energy
                     g_flops += layer.get_flops() * self.devices['GPU'].num_xpu
@@ -443,13 +495,9 @@ class System:
             config[0] = self.devices['Acc'].pim_type.name
 
         output = [tag, config, perf_all, energy_all]
-        if lout > 1:
-            print(
-                "    Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
-                .format(batch_size, batch_size / ((perf_all[len(s_perf)]) / 1000),
-                        perf_all[len(s_perf)], pipe, parallel_ff, power_constraint))
-        else:
-            print("No generation")
+        print(
+            "    Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
+            .format(batch_size, batch_size / ((perf_all[len(s_perf)]) / 1000), perf_all[len(s_perf)], pipe, parallel_ff, power_constraint))
 
         if perfs is not None:
             perfs.append(output)

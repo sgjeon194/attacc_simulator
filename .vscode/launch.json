@@ -36,12 +36,13 @@
             "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_GEMMV_bank.py",
             "console": "integratedTerminal",
             "args": [
-                "--dhead", "12288",
-                "--nhead", "410", 
-                "--seqlen", "12288",
+                "-m", "1",
+                "-k", "16", 
+                "--n", "16",
                 "--dbyte", "2", 
-                "--output", "gen_attacc_l12288_nattn410_dhead128_dbyte2_pc1.trace"
+                "--output", "gen_attacc_m1_k16_n16_dbyte2_pc1.trace"
             ]
+            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 1 -k 16 -n 16 --dbyte 2 --output ramulator2/attacc_m1_k16_n16_dbyte2_pc1.trace
         },
         {
             "name": "Python: Debug attacc",
@@ -60,6 +61,7 @@
                 "--pim", "bank",
                 "--powerlimit", "--ffopt", "--pipeopt"
             ]
+            // python main.py --system dgx-attacc --gpu A100a --ngpu 8 --model GPT-175B --lin 2048 --lout 2 --batch 1 --pim bank --powerlimit --ffopt --pipeopt
         }
     ]
   }

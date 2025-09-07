@@ -48,7 +48,7 @@
             // k : bankperbyte = 128 : 2 가 유지된다
         },
         {
-            "name": "Python: Debug attacc",
+            "name": "Python: Debug attacc pim",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
@@ -65,6 +65,23 @@
                 "--powerlimit", "--ffopt", "--pipeopt"
             ]
             // python main.py --system dgx-attacc --gpu A100a --ngpu 8 --model GPT-175B --lin 2048 --lout 2 --batch 1 --pim bank --powerlimit --ffopt --pipeopt
+        },
+        {
+            "name": "Python: Debug attacc gpu",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--system", "dgx", 
+                "--gpu", "A100a", 
+                "--ngpu", "8", 
+                "--model", "GPT-175B",
+                "--lin", "2048", 
+                "--lout", "2",
+                "--batch", "1"
+            ]
+            // python main.py --system dgx --gpu A100a --ngpu 8 --model GPT-175B --lin 2048 --lout 2 --batch 1
         }
     ]
   }

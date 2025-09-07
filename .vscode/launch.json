@@ -38,11 +38,14 @@
             "args": [
                 "-m", "1",
                 "-k", "16", 
-                "--n", "16",
+                "-n", "16",
                 "--dbyte", "2", 
                 "--output", "gen_attacc_m1_k16_n16_dbyte2_pc1.trace"
             ]
-            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 1 -k 16 -n 16 --dbyte 2 --output ramulator2/attacc_m1_k16_n16_dbyte2_pc1.trace
+            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 1 -k 12288 -n 12288 --dbyte 2 --output ramulator2/attacc_m1_k16_n16_dbyte2_pc1.trace
+            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 410 -k 12288 -n 12288 --dbyte 2 --output ramulator2/attacc_m1_k12288_n12288_dbyte2_pc1.trace
+            //      410 = 2048 / 5, 410 / channel 수 (16) = 26
+            // k : bankperbyte = 128 : 2 가 유지된다
         },
         {
             "name": "Python: Debug attacc",

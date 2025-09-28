@@ -97,7 +97,7 @@ class Ramulator:
         trace_file = os.path.join(self.ramulator_dir, file_name + '.trace')
 
         if layer.type == LayerType.FC:
-            trace_generator = "trace_gen/gen_trace_GEMMV_bank.py"
+            trace_generator = "trace_gen/gen_trace_GEMMV_bank_update.py"
             trace_args = "-m {} -k {} -n {} --dbyte {} --output {}".format(
                 num_ops_per_hbm, layer.k, layer.n, dbyte, trace_file)
         else:

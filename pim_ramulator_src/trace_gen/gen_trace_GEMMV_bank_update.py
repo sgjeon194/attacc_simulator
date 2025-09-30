@@ -112,24 +112,24 @@ def gemv(partial_n, weight_addr, num_itr, valid_channel=n_channel):
 
 
 # n_head and n_req = n_req per a HBM
-def run_gemv(m, k, n, trace_file_name): 
+def run_gemm(m, k, n, trace_file_name): 
     partition_size = math.ceil(max_L * k / (n_pch * n_rank * n_bg * n_bank))
-    head_offset = partition_size
-    v_offset = pow(2, 23)
+    # head_offset = partition_size
+    # v_offset = pow(2, 23)
 
-    cmd_list_reset()
-    ##-- Generate Commands --##
-    num_itr = math.ceil(m / (n_channel))
-    for itr in range(num_itr):
-        remainder = 0
-        if m / ((itr + 1) * n_channel) < 1:
-            remainder = m % n_channel
-        key_addr = itr * partition_size
-        val_addr = key_addr + v_offset
-        if remainder == 0:
-            gemv(n, key_addr, val_addr, itr)
-        else:
-            gemv(n, key_addr, val_addr, itr, remainder)
+    # cmd_list_reset()
+    # ##-- Generate Commands --##
+    # num_itr = math.ceil(m / (n_channel))
+    # for itr in range(num_itr):
+    #     remainder = 0
+    #     if m / ((itr + 1) * n_channel) < 1:
+    #         remainder = m % n_channel
+    #     key_addr = itr * partition_size
+    #     val_addr = key_addr + v_offset
+    #     if remainder == 0:
+    #         gemv(n, key_addr, val_addr, itr)
+    #     else:
+    #         gemv(n, key_addr, val_addr, itr, remainder)
 
 
     max_parameter_per_bank = pow(2, 23)
@@ -139,9 +139,7 @@ def run_gemv(m, k, n, trace_file_name):
     weight_addr = 0
 
     for i in range(m):
-        gemv(width_per_channel, weight_addr, num_itr)
-        
-            
+        gemv(width_per_channel, weight_addr, num_itr)            
 
     ##-- Ovelapping Commands --##
     barrier = []
@@ -151,7 +149,7 @@ def run_gemv(m, k, n, trace_file_name):
         barrier.append("PIM_BARRIER 0x{0:0>8}".format(hex_addr))
 
     total_cmd = []
-    for i in range(0, num_itr - 1, 2):
+    for i in range(0, m - 1, 2):
         # Head0: Score
             ## WRGB
         total_cmd += cmd_score_wrgb[i]
@@ -194,8 +192,8 @@ def run_gemv(m, k, n, trace_file_name):
                         break;
                     total_cmd += cmd_score_mac[i+1][j*stride+k_idx]
 
-    if num_itr % 2 != 0:
-        i = num_itr - 1
+    if m % 2 != 0:
+        i = m - 1
 
         # Score
             ## WRGB
@@ -269,7 +267,7 @@ def main():
         print(f"     {key}: {value}")
     print("---------------------------------------------------")
     
-    run_gemv(m, k, n, args.output)
+    run_gemm(m, k, n, args.output)
 
 
 if __name__ == "__main__":

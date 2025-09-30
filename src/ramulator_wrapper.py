@@ -99,7 +99,7 @@ class Ramulator:
         if layer.type == LayerType.FC:
             trace_generator = "trace_gen/gen_trace_GEMMV_bank_update.py"
             trace_args = "-m {} -k {} -n {} --dbyte {} --output {}".format(
-                num_ops_per_hbm, layer.k, layer.n, dbyte, trace_file)
+                layer.m, layer.k, math.ceil(layer.n / self.num_hbm), dbyte, trace_file)
         else:
             trace_generator = "trace_gen/gen_trace_attacc_{}.py".format(pim_type_name)
             trace_args = "--dhead {} --nhead {} --seqlen {} --dbyte {} --output {}".format(
@@ -108,7 +108,7 @@ class Ramulator:
         trace_exc = os.path.join(
             self.ramulator_dir,
             trace_generator)
-        
+            
         gen_trace_cmd = f"python {trace_exc} {trace_args}"
 
         # generate trace
@@ -160,6 +160,7 @@ class Ramulator:
             n_cmds["wrgb"]
         ]
         return out
+    
 
     def run(self, pim_type: PIMType, layer: Layer, power_constraint=True):
         if os.path.exists(self.ramulator_dir):
@@ -174,11 +175,13 @@ class Ramulator:
                 num_ops_group = math.ceil(num_ops_per_hbm / minimum_heads)
                 num_ops_per_hbm = minimum_heads
 
-            # file_name = "attacc_l{}_nattn{}_dhead{}_dbyte{}_pc{}".format(
-            #     l, num_ops_per_hbm, dhead, layer.dbyte, int(power_constraint))
-            file_name = "attacc_m{}_k{}_n{}_dbyte{}_pc{}".format(
-                layer.m, layer.k, layer.n, layer.dbyte, int(power_constraint))
-            
+            if layer.type == LayerType.FC:
+                file_name = "attacc_m{}_k{}_n{}_dbyte{}_pc{}".format(
+                    layer.m, layer.k, layer.n, layer.dbyte, int(power_constraint))                
+            else:
+                file_name = "attacc_l{}_nattn{}_dhead{}_dbyte{}_pc{}".format(
+                    l, num_ops_per_hbm, dhead, layer.dbyte, int(power_constraint))
+                
             yaml_file = os.path.join(self.ramulator_dir, file_name + '.yaml')
             self.make_yaml_file(yaml_file, file_name, power_constraint)
 
@@ -210,12 +213,12 @@ class Ramulator:
                 mem_acc *= 1
 
             ## update log file
-
-            log = [
-                l, num_ops_per_hbm, dhead, dbyte, pim_type.name,
-                power_constraint
-            ] + result
-            self.update_log_file(log)
+            if layer.type != LayerType.FC:    
+                log = [
+                    l, num_ops_per_hbm, dhead, dbyte, pim_type.name,
+                    power_constraint
+                ] + result
+                self.update_log_file(log)
 
             ## si, tsv, giomux to bgmux, bgmux to column decoder, bank RD
             traffic = [si_io, tsv_io, giomux_io, bgmux_io, mem_acc]

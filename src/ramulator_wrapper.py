@@ -12,14 +12,18 @@ class Ramulator:
     def __init__(self,
                  modelinfos,
                  ramulator_dir,
-                 output_log='',
+                 output_log_gemm='',
+                 output_log_atten='',
                  fast_mode=False,
                  num_hbm=5):
-        self.df = pd.DataFrame()
+        self.df_atten = pd.DataFrame()
         self.ramulator_dir = ramulator_dir
-        self.output_log = output_log
-        if os.path.exists(output_log):
-            self.df = pd.read_csv(output_log)
+        self.output_log_atten = output_log_atten
+        if os.path.exists(output_log_atten):
+            self.df_atten = pd.read_csv(output_log_atten)
+        self.output_log_gemm = output_log_gemm
+        if os.path.exists(output_log_gemm):
+            self.df_gemm = pd.read_csv(output_log_gemm)
         self.tCK = 0.769  # ns
         self.num_hbm = num_hbm
         self.nhead = modelinfos['num_heads']
@@ -67,10 +71,10 @@ class Ramulator:
         with open(yaml_file, 'w') as f:
             f.write(line)
 
-    def update_log_file(self, log):
-        if self.df.empty:
-            if os.path.exists(self.output_log):
-                df = pd.read_csv(self.output_log)
+    def update_log_file_atten(self, log):
+        if self.df_atten.empty:
+            if os.path.exists(self.output_log_atten):
+                df = pd.read_csv(self.output_log_atten)
             else:
                 columns = [
                     'L', 'nhead', 'dhead', 'dbyte', 'pim_type',
@@ -79,15 +83,37 @@ class Ramulator:
                 ]
                 df = pd.DataFrame(columns=columns)
         else:
-            df = self.df
+            df = self.df_atten
         if len(df.columns) > 12:
             import pdb
             pdb.set_trace()
         new_df = pd.DataFrame(columns=df.columns)
         new_df.loc[0] = log
         df = pd.concat([df, new_df]).drop_duplicates()
-        self.df = df
-        self.df.to_csv(self.output_log, index=False)
+        self.df_atten = df
+        self.df_atten.to_csv(self.output_log_atten, index=False)
+        
+    def update_log_file_gemm(self, log):
+        if self.df_gemm.empty:
+            if os.path.exists(self.output_log_gemm):
+                df = pd.read_csv(self.output_log_gemm)
+            else:
+                columns = [
+                    'm', 'k', 'n', 'dbyte', 'pim_type',
+                    'power_constraint', 'cycle', 'mac', 'softmax', 'mvgb',
+                    'mvsb', 'wrgb'
+                ]
+                df = pd.DataFrame(columns=columns)
+        else:
+            df = self.df_gemm
+        if len(df.columns) > 12:
+            import pdb
+            pdb.set_trace()
+        new_df = pd.DataFrame(columns=df.columns)
+        new_df.loc[0] = log
+        df = pd.concat([df, new_df]).drop_duplicates()
+        self.df_gemm = df
+        self.df_gemm.to_csv(self.output_log_gemm, index=False)
 
     #def run_ramulator(self):
     def run_ramulator(self, pim_type: PIMType, layer:Layer, num_ops_per_hbm, dbyte,
@@ -177,7 +203,7 @@ class Ramulator:
 
             if layer.type == LayerType.FC:
                 file_name = "attacc_m{}_k{}_n{}_dbyte{}_pc{}".format(
-                    layer.m, layer.k, layer.n, layer.dbyte, int(power_constraint))                
+                    layer.m, layer.k, layer.n, layer.dbyte, int(power_constraint))
             else:
                 file_name = "attacc_l{}_nattn{}_dhead{}_dbyte{}_pc{}".format(
                     l, num_ops_per_hbm, dhead, layer.dbyte, int(power_constraint))
@@ -218,7 +244,14 @@ class Ramulator:
                     l, num_ops_per_hbm, dhead, dbyte, pim_type.name,
                     power_constraint
                 ] + result
-                self.update_log_file(log)
+                self.update_log_file_atten(log)
+
+            else:
+                log = [
+                    layer.m, layer.k, layer.n, dbyte, pim_type.name,
+                    power_constraint
+                ] + result
+                self.update_log_file_gemm(log)
 
             ## si, tsv, giomux to bgmux, bgmux to column decoder, bank RD
             traffic = [si_io, tsv_io, giomux_io, bgmux_io, mem_acc]
@@ -231,7 +264,7 @@ class Ramulator:
             assert 0, "Need to install ramulator"
 
     def output(self, pim_type: PIMType, layer: Layer, power_constraint=True):
-        if self.df.empty:
+        if self.df_atten.empty:
             self.run(pim_type, layer, power_constraint)
 
         num_ops_per_attacc = layer.numOp
@@ -245,10 +278,16 @@ class Ramulator:
         l = layer.n
         dhead = layer.k
         dbyte = layer.dbyte
-        row = self.df[(self.df['L'] == l) & (self.df['nhead'] == num_ops_per_hbm) & \
-                      (self.df['dbyte'] == dbyte) & (self.df['dhead'] == dhead) & \
-                      (self.df['power_constraint'] == power_constraint) &  \
-                      (self.df['pim_type'] == pim_type.name)]
+        if layer.type == LayerType.FC:
+            row = self.df_gemm[(self.df_gemm['m'] == layer.m) & (self.df_gemm['k'] == layer.k) & \
+                        (self.df_gemm['dbyte'] == dbyte) & (self.df_gemm['n'] == layer.n) & \
+                        (self.df_gemm['power_constraint'] == power_constraint) &  \
+                        (self.df_gemm['pim_type'] == pim_type.name)]
+        else:
+            row = self.df_atten[(self.df_atten['L'] == l) & (self.df_atten['nhead'] == num_ops_per_hbm) & \
+                        (self.df_atten['dbyte'] == dbyte) & (self.df_atten['dhead'] == dhead) & \
+                        (self.df_atten['power_constraint'] == power_constraint) &  \
+                        (self.df_atten['pim_type'] == pim_type.name)]
         if row.empty:
             return self.run(pim_type, layer, power_constraint)
 

@@ -30,21 +30,43 @@
             ]
         },
         {
-            "name": "Python: Debug lora trace gen",
+            "name": "Python: Debug GEMM trace gen",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_attacc_bank.py",
+            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_GEMMV_bank.py",
             "console": "integratedTerminal",
             "args": [
-                "--dhead", "128",
-                "--nhead", "52", 
-                "--seqlen", "32",
+                "-m", "1",
+                "-k", "16", 
+                "-n", "16",
                 "--dbyte", "2", 
-                "--output", "gen_trace_output_attacc_l32_nattn52_dhead128_dbyte2_pc1.trace"
+                "--output", "gen_attacc_m1_k16_n16_dbyte2_pc1.trace"
             ]
+            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 1 -k 12288 -n 12288 --dbyte 2 --output ramulator2/attacc_m1_k16_n16_dbyte2_pc1.trace
+            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 410 -k 12288 -n 12288 --dbyte 2 --output ramulator2/attacc_m1_k12288_n12288_dbyte2_pc1.trace
+            //      410 = 2048 / 5, 410 / channel 수 (16) = 26
+            // k : bankperbyte = 128 : 2 가 유지된다
         },
         {
-            "name": "Python: Debug attacc",
+            "name": "Python: Debug Updated GEMM trace gen",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ramulator2/trace_gen/gen_trace_GEMMV_bank_update.py",
+            "console": "integratedTerminal",
+            "args": [
+                "-m", "1",
+                "-k", "12288", 
+                "-n", "12288",
+                "--dbyte", "2", 
+                "--output", "gen_attacc_m1_k12288_n12288_dbyte2_pc1_new.trace"
+            ]
+            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 1 -k 12288 -n 12288 --dbyte 2 --output ramulator2/attacc_m1_k12288_n12288_dbyte2_pc1_new.trace
+            // python ramulator2/trace_gen/gen_trace_GEMMV_bank.py -m 410 -k 12288 -n 12288 --dbyte 2 --output ramulator2/attacc_m1_k12288_n12288_dbyte2_pc1_new.trace
+            //      410 = 2048 / 5, 410 / channel 수 (16) = 26
+            // k : bankperbyte = 128 : 2 가 유지된다
+        },
+        {
+            "name": "Python: Debug attacc pim",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
@@ -60,6 +82,24 @@
                 "--pim", "bank",
                 "--powerlimit", "--ffopt", "--pipeopt"
             ]
+            // python main.py --system dgx-attacc --gpu A100a --ngpu 8 --model GPT-175B --lin 2048 --lout 2 --batch 1 --pim bank --powerlimit --ffopt --pipeopt
+        },
+        {
+            "name": "Python: Debug attacc gpu",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--system", "dgx", 
+                "--gpu", "A100a", 
+                "--ngpu", "8", 
+                "--model", "GPT-175B",
+                "--lin", "2048", 
+                "--lout", "2",
+                "--batch", "1"
+            ]
+            // python main.py --system dgx --gpu A100a --ngpu 8 --model GPT-175B --lin 2048 --lout 2 --batch 1
         }
     ]
   }

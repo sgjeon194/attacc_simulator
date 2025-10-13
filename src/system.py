@@ -42,7 +42,7 @@ class System:
     def set_accelerator(self, modelinfos, name: DeviceType, config):
         self.hetero_name = name
         if self.hetero_name == DeviceType.PIM:
-            ramulator = Ramulator(modelinfos, "ramulator2", "ramulator.out")
+            ramulator = Ramulator(modelinfos, "ramulator2", "ramulator_gemm.out", "ramulator_atten.out")
             self.devices['Acc'] = PIM(config,
                                       self.scaling_factor,
                                       ramulator)
@@ -60,15 +60,62 @@ class System:
         self.model.tp = self.GPU.num_xpu
         
         
-    def simulate_base_test(self, batch_size, lin, lout):
-        prefill_gpu_layer = Layer('sum', 'score', LayerType.FC, True, self.model.dtype, 
-                batch_size * lin, int(32 / self.model.tp), self.model.hdim, 1) 
+    def simulate_GEMM_test(self, batch_size, lin, lout):
+        GEMM_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+                batch_size, self.model.hdim, self.model.hdim, 1)
         
-        prefiil_gpu_time, prefill_gpu_energy = self.devices['GPU'].get_time_and_energy(prefill_gpu_layer)
-        print(f"Prefill(GEMM) on GPU")
-        print(f"    m = {prefill_gpu_layer.m}, k = {prefill_gpu_layer.k}, n = {prefill_gpu_layer.n}, numOPs = {prefill_gpu_layer.numOp}")
-        print(f"    Time: {prefiil_gpu_time * 1000 * 1000} us, Energy: {prefill_gpu_energy} nJ")
+        GEMM_pim_time, GEMM_pim_energy = self.devices['Acc'].get_time_and_energy(GEMM_pim_layer)
+        print(f"GEMM on pim")
+        print(f"    m = {GEMM_pim_layer.m}, k = {GEMM_pim_layer.k}, n = {GEMM_pim_layer.n}, numOPs = {GEMM_pim_layer.numOp}")
+        print(f"    Time: {GEMM_pim_time * 1000 * 1000} us, Energy: {GEMM_pim_energy} nJ")
         
+        GEMM_gpu_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+                batch_size, self.model.hdim, self.model.hdim, 1) 
+        
+        GEMM_gpu_time, GEMM_gpu_energy = self.devices['GPU'].get_time_and_energy(GEMM_gpu_layer)
+        print(f"GEMM on GPU")
+        print(f"    m = {GEMM_gpu_layer.m}, k = {GEMM_gpu_layer.k}, n = {GEMM_gpu_layer.n}, numOPs = {GEMM_gpu_layer.numOp}")
+        print(f"    Time: {GEMM_gpu_time * 1000 * 1000} us, Energy: {GEMM_gpu_energy} nJ")
+        
+        
+    def simulate_GEMV_test(self, batch_size, lin, lout):
+        
+        GEMV_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+                1, self.model.hdim, self.model.hdim, 1)
+        # GEMV_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+        #         1, 16, 16, 1)
+        
+        GEMV_pim_time, GEMV_pim_energy = self.devices['Acc'].get_time_and_energy(GEMV_pim_layer)
+        print(f"GEMV on pim")
+        print(f"    m = {GEMV_pim_layer.m}, k = {GEMV_pim_layer.k}, n = {GEMV_pim_layer.n}, numOPs = {GEMV_pim_layer.numOp}")
+        print(f"    Time: {GEMV_pim_time * 1000 * 1000} us, Energy: {GEMV_pim_energy} nJ")
+        
+        GEMV_gpu_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+            1, self.model.hdim, self.model.hdim, 1) 
+        
+        GEMV_gpu_time, GEMV_gpu_energy = self.devices['GPU'].get_time_and_energy(GEMV_gpu_layer)
+        print(f"GEMV on GPU")
+        print(f"    m = {GEMV_gpu_layer.m}, k = {GEMV_gpu_layer.k}, n = {GEMV_gpu_layer.n}, numOPs = {GEMV_gpu_layer.numOp}")
+        print(f"    Time: {GEMV_gpu_time * 1000 * 1000} us, Energy: {GEMV_gpu_energy} nJ")
+        
+    def simluate_GEMM_test(self, batch_size, lin, lout):
+        GEMM_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+                batch_size, self.model.hdim, self.model.hdim, 1)
+        # GEMM_pim_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+        #         1, 16, 16, 1)
+        
+        GEMM_pim_time, GEMM_pim_energy = self.devices['Acc'].get_time_and_energy(GEMM_pim_layer)
+        print(f"GEMM on pim")
+        print(f"    m = {GEMM_pim_layer.m}, k = {GEMM_pim_layer.k}, n = {GEMM_pim_layer.n}, numOPs = {GEMM_pim_layer.numOp}")
+        print(f"    Time: {GEMM_pim_time * 1000 * 1000} us, Energy: {GEMM_pim_energy} nJ")
+        
+        GEMM_gpu_layer = Layer('sum', 'qkv', LayerType.FC, True, self.model.dtype, 
+            1, self.model.hdim, self.model.hdim, 1) 
+        
+        GEMM_gpu_time, GEMM_gpu_energy = self.devices['GPU'].get_time_and_energy(GEMM_gpu_layer)
+        print(f"GEMM on GPU")
+        print(f"    m = {GEMM_gpu_layer.m}, k = {GEMM_gpu_layer.k}, n = {GEMM_gpu_layer.n}, numOPs = {GEMM_gpu_layer.numOp}")
+        print(f"    Time: {GEMM_gpu_time * 1000 * 1000} us, Energy: {GEMM_gpu_energy} nJ")
         
     def simulate_lora_test(self, batch_size, lin, lout):
         prefill_gpu_layer = Layer('sum', 'score', LayerType.FC, True, self.model.dtype, 

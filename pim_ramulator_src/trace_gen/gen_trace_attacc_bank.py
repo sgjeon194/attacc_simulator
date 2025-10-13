@@ -51,7 +51,7 @@ cmd_score_wrgb   = []
 cmd_score_mac    = []
 cmd_score_mvsb   = []
 cmd_sfm          = []
-cmd_context_mvgb  = []
+cmd_context_mvgb = []
 cmd_context_mac  = []
 cmd_context_mvsb = []
 
@@ -98,9 +98,9 @@ def Attention(L, key_addr, val_addr, itr, valid_channel = n_channel):
     # MAC and move output vector to softmax buffer
     ## Vector (1 x k) x Matrix (k x n) multiplication
     ## GEMV unit = adder tree mode
-    for n_idx in range(math.ceil(L / n_pch / n_rank / n_bg)):# 16 
+    for n_idx in range(math.ceil(L / n_pch / n_rank / n_bg)):# 2049 / 16 
       cmd_score_mac[itr].append([])
-      for k_idx in range(math.ceil(dhead / n_bank / n_mac)): # 2
+      for k_idx in range(math.ceil(dhead / n_bank / n_mac)): # 128 / 64
         idx = k_idx + n_idx * math.ceil(dhead / n_bank / n_mac) 
 
         # All bank command (legacy channel)

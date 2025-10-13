@@ -346,8 +346,6 @@ class PIM:
                 energies = [i * self.num_attacc for i in energies]
 
                 return time, energies
-            elif 'qkv' in layer.name:
-                return 0, [0, 0, 0, 0, 0, 0]
             else:
                 return 0, [0, 0, 0, 0, 0, 0]
 
@@ -366,6 +364,23 @@ class PIM:
             energy = self._get_energy(layer)
 
             return exec_time, energy
+        
+        elif layer.type == LayerType.FC:
+            m, n, k, numOp, dbyte = layer.get_infos()
+            time, traffic = self.ramulator.output(
+                self.pim_type, layer, self.power_constraint)
+            io_energy = 0
+            for i in range(len(self.io_energy_table)):
+                io_energy += traffic[i] * self.io_energy_table[i]
 
+            energy_per_access = self.energy_table['mem']
+            cell_energy = traffic[-1] * energy_per_access
+            dram_energy = cell_energy + io_energy
+            cal_energy = layer.get_flops() / 2 * self.energy_table['alu']
+
+            energies = [dram_energy, 0, 0, 0, cal_energy, 0]
+            energies = [i * self.num_attacc for i in energies]
+
+            return time, energies
         else:
             assert 0, "PIM does not support this layer."

@@ -224,6 +224,8 @@ def make_model_config(name, dtype):
         'dhead': dhead,
         'ff_scale': ff_scale,
         'gqa_size': gqa_size,
-        'dtype': dtype
+        'dtype': dtype,
+        'use_lora': True,
+        'lora_rank': 8
     }
     return config

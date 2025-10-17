@@ -105,13 +105,12 @@ class Transformer:
         self.sum_decoder.append(
             Layer('sum', 'qkv', LayerType.FC, True, self.dtype, 
                   batch * lin, 3 * int(self.hdim / self.tp), self.hdim, 1))
-        
         if self.use_lora:
             self.sum_decoder.append(
-                Layer('sum', 'lora_qkv', LayerType.FC, True, self.dtype, 
+                Layer('sum', 'lora_shrink_qkv', LayerType.FC, True, self.dtype, 
                       lin, 3 * int(self.lora_rank / self.tp), self.hdim, batch))
             self.sum_decoder.append(
-                Layer('sum', 'lora_qkv', LayerType.FC, True, self.dtype, 
+                Layer('sum', 'lora_expand_qkv', LayerType.FC, True, self.dtype, 
                       lin, self.hdim, 3 * int(self.lora_rank / self.tp), batch))
             
         if (attn_on_hetero):
@@ -132,17 +131,17 @@ class Transformer:
                   self.dhead, lin,
                   int(self.num_heads / self.tp) * batch))
         
+        self.sum_decoder.append(
+            Layer('sum', 'proj', LayerType.FC, True, self.dtype, 
+                  batch * lin, self.hdim, int(self.hdim / self.tp), 1))
         if self.use_lora:
             self.sum_decoder.append(
-                Layer('sum', 'lora_o', LayerType.FC, True, self.dtype, 
+                Layer('sum', 'lora_shrink_o_prog', LayerType.FC, True, self.dtype, 
                       lin, int(self.lora_rank / self.tp), self.hdim, batch))
             self.sum_decoder.append(
-                Layer('sum', 'lora_o', LayerType.FC, True, self.dtype, 
+                Layer('sum', 'lora_expand_o_prog', LayerType.FC, True, self.dtype, 
                       lin, self.hdim, int(self.lora_rank / self.tp), batch))
         
-        self.sum_decoder.append(
-            Layer('sum', 'proj', LayerType.FC, True, self.dtype, batch * lin,
-                  self.hdim, int(self.hdim / self.tp), 1))
         self.sum_decoder.append(
             Layer('sum', 'comm_g2g', LayerType.G2G, False, self.dtype, batch * lin,
                   self.hdim, 1, 1))
@@ -156,10 +155,19 @@ class Transformer:
             self.sum_decoder.append(
                 Layer('sum', 'ff2', LayerType.FC, True, self.dtype, batch * lin,
                       self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
-            
             if self.use_lora:
-                print("LoRA for llama is not yet supported")
-                pass
+                self.sum_decoder.append(
+                    Layer('sum', 'lora_shrink_ffn1', LayerType.FC, True, self.dtype, 
+                        lin, int(self.lora_rank / self.tp), self.hdim, batch))
+                self.sum_decoder.append(
+                    Layer('sum', 'lora_expand_ffn1', LayerType.FC, True, self.dtype, 
+                        lin, self.hdim, int(self.lora_rank / self.tp), batch))
+                self.sum_decoder.append(
+                    Layer('sum', 'lora_shrink_ffn2', LayerType.FC, True, self.dtype, 
+                        lin, int(self.lora_rank / self.tp), self.hdim, batch))
+                self.sum_decoder.append(
+                    Layer('sum', 'lora_expand_ffn2', LayerType.FC, True, self.dtype, 
+                        lin, self.hdim, int(self.lora_rank / self.tp), batch))
             
             self.sum_decoder.append(
                 Layer('sum', 'glu', LayerType.ACT, False, self.dtype, batch * lin,
@@ -167,6 +175,13 @@ class Transformer:
             self.sum_decoder.append(
                 Layer('sum', 'ff3', LayerType.FC, True, self.dtype, batch * lin,
                       self.hdim, self.ff_scale * int(self.hdim / self.tp), 1))
+            if self.use_lora:
+                self.sum_decoder.append(
+                    Layer('sum', 'lora_shrink_ffn3', LayerType.FC, True, self.dtype, 
+                        lin, int(self.lora_rank / self.tp), self.hdim, batch))
+                self.sum_decoder.append(
+                    Layer('sum', 'lora_expand_ffn3', LayerType.FC, True, self.dtype, 
+                        lin, self.hdim, int(self.lora_rank / self.tp), batch))
         else:
             self.sum_decoder.append(
                 Layer('sum', 'ff1', LayerType.FC, True, self.dtype, batch * lin,
@@ -174,10 +189,10 @@ class Transformer:
             
             if self.use_lora:
                 self.sum_decoder.append(
-                    Layer('sum', 'lora_up', LayerType.FC, True, self.dtype, 
+                    Layer('sum', 'lora_shrink_ff1', LayerType.FC, True, self.dtype, 
                         lin, int(self.lora_rank / self.tp), self.hdim, batch))
                 self.sum_decoder.append(
-                    Layer('sum', 'lora_up', LayerType.FC, True, self.dtype, 
+                    Layer('sum', 'lora_expand_ff1', LayerType.FC, True, self.dtype, 
                         lin, self.hdim, int(self.lora_rank / self.tp), batch))
             
             if 'OPT' in self.name:
@@ -194,13 +209,12 @@ class Transformer:
             self.sum_decoder.append(
                 Layer('sum', 'ff2', LayerType.FC, True, self.dtype, 
                       batch * lin, self.hdim, self.ff_scale * int(self.hdim / self.tp), 1))
-            
             if self.use_lora:
                 self.sum_decoder.append(
-                    Layer('sum', 'lora_down', LayerType.FC, True, self.dtype, 
+                    Layer('sum', 'lora_shrink_ff2', LayerType.FC, True, self.dtype, 
                         lin, self.hdim, int(self.lora_rank / self.tp), batch))
                 self.sum_decoder.append(
-                    Layer('sum', 'lora_down', LayerType.FC, True, self.dtype, 
+                    Layer('sum', 'lora_expand_ff2', LayerType.FC, True, self.dtype, 
                         lin, int(self.lora_rank / self.tp), self.hdim, batch))
             
         self.sum_decoder.append(
@@ -215,14 +229,13 @@ class Transformer:
             decoder.append(
                 Layer('gen', 'qkv', LayerType.FC, True, self.dtype, 
                       batch, 3 * int(self.hdim / self.tp), self.hdim, 1))
-            
             if self.use_lora:
                 decoder.append(
-                    Layer('gen', 'lora_qkv', LayerType.FC, True, self.dtype, 
-                        lin, 3 * int(self.lora_rank / self.tp), self.hdim, batch))
+                    Layer('gen', 'lora_shrink_qkv', LayerType.FC, True, self.dtype, 
+                        1, 3 * int(self.lora_rank / self.tp), self.hdim, batch))
                 decoder.append(
-                    Layer('gen', 'lora_qkv', LayerType.FC, True, self.dtype, 
-                        lin, self.hdim, 3 * int(self.lora_rank / self.tp), batch))
+                    Layer('gen', 'lora_expand_qkv', LayerType.FC, True, self.dtype, 
+                        1, self.hdim, 3 * int(self.lora_rank / self.tp), batch))
             
             if (attn_on_hetero):
                 decoder.append(
@@ -241,25 +254,23 @@ class Transformer:
                       1, self.dhead, lin + stage,
                       int(self.num_heads / self.tp) * batch))
             
-            
-                
-            if self.use_lora:
-                decoder.append(
-                    Layer('gen', 'lora_o', LayerType.FC, True, self.dtype, 
-                        lin, int(self.lora_rank / self.tp), self.hdim, batch))
-                decoder.append(
-                    Layer('gen', 'lora_o', LayerType.FC, True, self.dtype, 
-                        lin, self.hdim, int(self.lora_rank / self.tp), batch))
-
-            
             if (attn_on_hetero):
                 decoder.append(
                     Layer('gen', 'comm_x2g', LayerType.X2G, False, self.dtype, 1,
                           self.dhead, 1,
                           int(self.num_heads / self.tp) * batch))
+                
             decoder.append(
                 Layer('gen', 'proj', LayerType.FC, True, self.dtype, batch,
                       self.hdim, int(self.hdim / self.tp), 1))
+            if self.use_lora:
+                decoder.append(
+                    Layer('gen', 'lora_o_shrink_proj', LayerType.FC, True, self.dtype, 
+                        1, int(self.lora_rank / self.tp), self.hdim, batch))
+                decoder.append(
+                    Layer('gen', 'lora_o_expand_proj', LayerType.FC, True, self.dtype, 
+                        1, self.hdim, int(self.lora_rank / self.tp), batch))
+                
             decoder.append(
                 Layer('gen', 'comm_g2g', LayerType.G2G, False, self.dtype, batch,
                       self.hdim, 1, 1))
@@ -275,6 +286,20 @@ class Transformer:
                     Layer('gen', 'ff2', LayerType.FC, True, self.dtype, batch,
                           self.ff_scale * int(self.hdim / self.tp), self.hdim,
                           1))
+                if self.use_lora:
+                    decoder.append(
+                        Layer('gen', 'lora_shrink_ffn1', LayerType.FC, True, self.dtype, 
+                            1, int(self.lora_rank / self.tp), self.hdim, batch))
+                    decoder.append(
+                        Layer('gen', 'lora_expand_ffn1', LayerType.FC, True, self.dtype, 
+                            1, self.hdim, int(self.lora_rank / self.tp), batch))
+                    decoder.append(
+                        Layer('gen', 'lora_shrink_ffn2', LayerType.FC, True, self.dtype, 
+                            1, int(self.lora_rank / self.tp), self.hdim, batch))
+                    decoder.append(
+                        Layer('gen', 'lora_expand_ffn2', LayerType.FC, True, self.dtype, 
+                            1, self.hdim, int(self.lora_rank / self.tp), batch))
+                
                 decoder.append(
                     Layer('gen', 'glu', LayerType.ACT, False, self.dtype, batch,
                           self.ff_scale * int(self.hdim / self.tp), 1, 1))
@@ -282,6 +307,13 @@ class Transformer:
                     Layer('gen', 'ff3', LayerType.FC, True, self.dtype,
                           batch, self.hdim,
                           self.ff_scale * int(self.hdim / self.tp), 1))
+                if self.use_lora:
+                    decoder.append(
+                        Layer('gen', 'lora_shrink_ff3', LayerType.FC, True, self.dtype, 
+                            1, self.hdim, int(self.lora_rank / self.tp), batch))
+                    decoder.append(
+                        Layer('gen', 'lora_expand_ff3', LayerType.FC, True, self.dtype, 
+                            1, int(self.lora_rank / self.tp), self.hdim, batch))
             else:
                 decoder.append(
                     Layer('gen', 'ff1', LayerType.FC, True, self.dtype, batch,
@@ -290,11 +322,11 @@ class Transformer:
                                 
                 if self.use_lora:
                     decoder.append(
-                        Layer('gen', 'lora_up', LayerType.FC, True, self.dtype, 
-                            lin, int(self.lora_rank / self.tp), self.hdim, batch))
+                        Layer('gen', 'lora_shrink_ff1', LayerType.FC, True, self.dtype, 
+                            1, int(self.lora_rank / self.tp), self.hdim, batch))
                     decoder.append(
-                        Layer('gen', 'lora_up', LayerType.FC, True, self.dtype, 
-                            lin, self.hdim, int(self.lora_rank / self.tp), batch))
+                        Layer('gen', 'lora_expand_ff1', LayerType.FC, True, self.dtype, 
+                            1, self.hdim, int(self.lora_rank / self.tp), batch))
                     
                 if 'OPT' in self.name:
                     decoder.append(
@@ -312,11 +344,11 @@ class Transformer:
                           self.ff_scale * int(self.hdim / self.tp), 1))
                 if self.use_lora:
                     decoder.append(
-                        Layer('gen', 'lora_down', LayerType.FC, True, self.dtype, 
-                            lin, self.hdim, int(self.lora_rank / self.tp), batch))
+                        Layer('gen', 'lora_shrink_ff2', LayerType.FC, True, self.dtype, 
+                            1, self.hdim, int(self.lora_rank / self.tp), batch))
                     decoder.append(
-                        Layer('gen', 'lora_down', LayerType.FC, True, self.dtype, 
-                            lin, int(self.lora_rank / self.tp), self.hdim, batch))
+                        Layer('gen', 'lora_expand_ff2', LayerType.FC, True, self.dtype, 
+                            1, int(self.lora_rank / self.tp), self.hdim, batch))
 
             decoder.append(
                 Layer('gen', 'comm_g2g', LayerType.G2G, False, self.dtype, batch,

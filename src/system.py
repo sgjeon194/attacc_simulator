@@ -535,8 +535,11 @@ class System:
 
         output = [tag, config, perf_all, energy_all]
         print(
-            "    Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
+            "Prefill Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
             .format(batch_size, batch_size / ((perf_all[len(s_perf)]) / 1000), perf_all[len(s_perf)], pipe, parallel_ff, power_constraint))
+        print(
+            "Decode Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
+            .format(batch_size, batch_size / ((perf_all[len(g_perf)]) / 1000), perf_all[len(g_perf)], pipe, parallel_ff, power_constraint))
 
         if perfs is not None:
             perfs.append(output)

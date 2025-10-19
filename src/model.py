@@ -92,6 +92,7 @@ class Transformer:
         self.hdim = modelinfos['hdim']
         self.ff_scale = modelinfos['ff_scale']
         self.dtype = modelinfos['dtype']
+        self.layer_num = modelinfos['layer_num']
         self.dhead = int(self.hdim / self.num_heads)
         self.tp = tensor_parallel
         self.use_lora = modelinfos['use_lora']

@@ -386,7 +386,7 @@ class System:
                 'norm': 0
             }
             for layer in s_decoder:
-                exec_time = layer.exec_time
+                exec_time = layer.exec_time * self.model.layer_num
                 if layer.type == LayerType.FC:
                     s_perf['all'] += exec_time
                     s_perf['fc'] += exec_time
@@ -421,10 +421,9 @@ class System:
                 'act': 0,
                 'norm': 0
             }
-
             for gen_stage, decoder_block in enumerate(g_decoder):
                 for l_idx, layer in enumerate(decoder_block):
-                    exec_time = layer.exec_time
+                    exec_time = layer.exec_time * self.model.layer_num
                     g_perf['all'] += exec_time
                     if layer.type == LayerType.FC:
                         g_perf['fc'] += exec_time
@@ -472,6 +471,7 @@ class System:
                 gen_energies.get(LayerType.ACT, {}).get('comp', 0) +
                 gen_energies.get(LayerType.NORM, {}).get('comp', 0)
             ]
+            energies = energies * self.model.layer_num
             comm_energy = sum([v['comm'] for k, v in gen_energies.items()])
             energies.append(comm_energy)
 

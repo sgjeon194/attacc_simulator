@@ -201,7 +201,7 @@ def make_pim_config(pim_type: PIMType,
     return config
 
 
-def make_model_config(name, dtype):
+def make_model_config(name, dtype, use_lora=False):
     model_table = {}
     model_table['GPT-175B'] = [96, 12288, 96, 128, 4, 1, 96]
     model_table['GPT-89B'] = [48, 12288, 96, 128, 4, 1, 48]
@@ -226,7 +226,7 @@ def make_model_config(name, dtype):
         'gqa_size': gqa_size,
         'layer_num': layer_num,
         'dtype': dtype,
-        'use_lora': True,
+        'use_lora': use_lora,
         'lora_rank': 8
     }
     return config

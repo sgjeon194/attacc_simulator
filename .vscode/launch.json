@@ -97,7 +97,8 @@
                 "--model", "GPT-175B",
                 "--lin", "2048", 
                 "--lout", "2",
-                "--batch", "1"
+                "--batch", "1",
+                "--use_lora"
             ]
             // python main.py --system dgx --gpu A100a --ngpu 8 --model GPT-175B --lin 2048 --lout 2 --batch 1
         }

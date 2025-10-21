@@ -136,8 +136,8 @@ def main():
         "batch size, default = 1"
     )
     
-    parser.add_argument("--use_lora", type=bool, default=False, help="use lora or not")
-
+    parser.add_argument("--use_lora", action="store_true", help="use lora or not")
+    
     args = parser.parse_args()
 
     global RAMULATOR
@@ -167,6 +167,7 @@ def main():
 
     # set system
     dtype = DataType.W16A16 if args.word == 2 else DataType.W8A8
+    print(args.use_lora)
     modelinfos = make_model_config(args.model, dtype, args.use_lora)
     xpu_config = make_xpu_config(gpu_device, num_gpu=num_gpu, mem_cap=gmem_cap)
     system = System(xpu_config['GPU'], modelinfos)

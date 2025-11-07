@@ -336,8 +336,9 @@ class System:
                     if layer.type in [
                             LayerType.MATMUL, LayerType.SOFTMAX, LayerType.X2G
                     ]:
-                        print(f"{layer.name} Acc")
+                        print(f"{layer.name} {self.devices['Acc'].__class__.__name__}")
                         exec_time, energy = self.devices['Acc'].get_time_and_energy(layer)
+                        
                     else:
                         print(f"{layer.name} GPU")
                         exec_time, energy = self.devices['GPU'].get_time_and_energy(layer)

@@ -341,7 +341,7 @@ class System:
                     else:
                         print(f"{layer.name} GPU")
                         exec_time, energy = self.devices['GPU'].get_time_and_energy(layer)
-                    print(f"    time : {exec_time}, energy : {energy}")
+                    print(f"    time : {exec_time * 1000000} us, energy : {energy}")
                     layer.exec_time = exec_time
                     layer.energy = energy
                     g_flops += layer.get_flops() * self.devices['GPU'].num_xpu
@@ -535,7 +535,10 @@ class System:
 
         output = [tag, config, perf_all, energy_all]
         print(
-            "    Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f}ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
+            "Prefill Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f} ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
+            .format(batch_size, batch_size / ((perf_all[0]) / 1000), perf_all[0], pipe, parallel_ff, power_constraint))
+        print(
+            "Decode Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f} ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
             .format(batch_size, batch_size / ((perf_all[len(s_perf)]) / 1000), perf_all[len(s_perf)], pipe, parallel_ff, power_constraint))
 
         if perfs is not None:

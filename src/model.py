@@ -108,8 +108,14 @@ class Transformer:
                   batch * lin, int(self.hdim / self.tp) + 2 * int(int(self.hdim / self.gqa_size) / self.tp), self.hdim, 1))
         if self.use_lora:
             self.sum_decoder.append(
-                Layer('sum', 'lora_shrink_qkv', LayerType.FC, True, self.dtype, 
-                      lin, 3 * int(self.lora_rank / self.tp), self.hdim, batch)) # qkv can be done together
+                Layer('sum', 'lora_shrink_q', LayerType.FC, True, self.dtype, 
+                      lin, int(self.lora_rank / self.tp), self.hdim, batch))
+            self.sum_decoder.append(
+                Layer('sum', 'lora_shrink_k', LayerType.FC, True, self.dtype, 
+                      lin, int(self.lora_rank / self.tp), self.hdim, batch))
+            self.sum_decoder.append(
+                Layer('sum', 'lora_shrink_v', LayerType.FC, True, self.dtype, 
+                      lin, int(self.lora_rank / self.tp), self.hdim, batch))
             self.sum_decoder.append(
                 Layer('sum', 'lora_expand_q', LayerType.FC, True, self.dtype, 
                       lin, self.hdim, int(self.lora_rank / self.tp), batch))
@@ -155,11 +161,8 @@ class Transformer:
                   self.hdim, 1, 1))
         if 'LLAMA' in self.name:
             self.sum_decoder.append(
-                Layer('sum', 'ff1', LayerType.FC, True, self.dtype, batch * lin,
-                      self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
-            self.sum_decoder.append(
-                Layer('sum', 'ff2', LayerType.FC, True, self.dtype, batch * lin,
-                      self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
+                Layer('sum', 'ff1_2', LayerType.FC, True, self.dtype, batch * lin,
+                      2 * self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
             if self.use_lora:
                 self.sum_decoder.append(
                     Layer('sum', 'lora_shrink_ffn1', LayerType.FC, True, self.dtype, 
@@ -236,8 +239,14 @@ class Transformer:
                       batch, int(self.hdim / self.tp) + 2 * int(int(self.hdim / self.gqa_size) / self.tp), self.hdim, 1))
             if self.use_lora:
                 decoder.append(
-                    Layer('gen', 'lora_shrink_qkv', LayerType.FC, True, self.dtype, 
-                        1, 3 * int(self.lora_rank / self.tp), self.hdim, batch))
+                    Layer('gen', 'lora_shrink_q', LayerType.FC, True, self.dtype, 
+                        1, int(self.lora_rank / self.tp), self.hdim, batch))
+                decoder.append(
+                    Layer('gen', 'lora_shrink_k', LayerType.FC, True, self.dtype, 
+                        1, int(self.lora_rank / self.tp), self.hdim, batch))
+                decoder.append(
+                    Layer('gen', 'lora_shrink_v', LayerType.FC, True, self.dtype, 
+                        1, int(self.lora_rank / self.tp), self.hdim, batch))
                 decoder.append(
                     Layer('gen', 'lora_expand_q', LayerType.FC, True, self.dtype, 
                         1, self.hdim, int(self.lora_rank / self.tp), batch))
@@ -288,11 +297,11 @@ class Transformer:
                       self.hdim, 1, 1))
             if 'LLAMA' in self.name:
                 decoder.append(
-                    Layer('gen', 'ff1', LayerType.FC, True, self.dtype, 
-                          batch, self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
-                decoder.append(
-                    Layer('gen', 'ff2', LayerType.FC, True, self.dtype, 
-                          batch, self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
+                    Layer('gen', 'ff1_2', LayerType.FC, True, self.dtype, 
+                          batch, 2 * self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
+                # decoder.append(
+                #     Layer('gen', 'ff2', LayerType.FC, True, self.dtype, 
+                #           batch, self.ff_scale * int(self.hdim / self.tp), self.hdim, 1))
                 if self.use_lora:
                     decoder.append(
                         Layer('gen', 'lora_shrink_ffn1', LayerType.FC, True, self.dtype, 

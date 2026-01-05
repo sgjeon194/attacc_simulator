@@ -311,6 +311,11 @@ class System:
             wrt_io_busy = 0
             s_decoder = self.model.sum_decoder
             g_decoder = self.model.gen_decoder
+            
+            sum_time = []
+            sum_energy = []
+            gen_time = []
+            gen_energy = []
 
             ## Summarization stage
             for layer in s_decoder:
@@ -343,6 +348,10 @@ class System:
                         print(f"{layer.name} GPU")
                         exec_time, energy = self.devices['GPU'].get_time_and_energy(layer)
                     print(f"    time : {exec_time * 1000000} us, energy : {energy}")
+                    
+                    gen_time.append(exec_time * 1000000)
+                    gen_energy.append(energy)
+                    
                     layer.exec_time = exec_time
                     layer.energy = energy
                     g_flops += layer.get_flops() * self.devices['GPU'].num_xpu
@@ -541,6 +550,7 @@ class System:
         print(
             "Decode Batch: {}, Throughput: {:.2f} tokens/s Latency: {:.2f} ms, pipe/ff_parallel: {}/{}, powerlimit: {}"
             .format(batch_size, batch_size / ((perf_all[len(s_perf)]) / 1000), perf_all[len(s_perf)], pipe, parallel_ff, power_constraint))
+        print(f"Decode detail time: \n {gen_time}")
 
         if perfs is not None:
             perfs.append(output)
